@@ -6,7 +6,7 @@ class DuplicateCategory extends \Illuminate\Database\Eloquent\Model
 
     protected $table = 'categories';
 
-    protected $fillable = [ 'name' ];
+    protected $fillable = ['name'];
 
     public $timestamps = false;
 }

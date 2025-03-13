@@ -2,32 +2,33 @@
 
 namespace Kalnoy\Nestedset;
 
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\Query\Builder as Query;
 use Illuminate\Database\Query\Builder as BaseQueryBuilder;
+use Illuminate\Database\Query\Builder as Query;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Arr;
 use LogicException;
-use Illuminate\Database\Query\Expression;
 
+/**
+ * @template TModel of Model
+ *
+ * @extends Builder<TModel>
+ */
 class QueryBuilder extends Builder
 {
-    /**
-     * @var NodeTrait|Model
-     */
+    /** @var NodeTrait&Model */
     protected $model;
 
     /**
      * Get node's `lft` and `rgt` values.
      *
-     * @since 2.0
-     *
-     * @param mixed $id
-     * @param bool $required
-     *
+     * @param  mixed  $id
+     * @param  bool  $required
      * @return array
+     *
+     * @since 2.0
      */
     public function getNodeData($id, $required = false)
     {
@@ -35,25 +36,24 @@ class QueryBuilder extends Builder
 
         $query->where($this->model->getKeyName(), '=', $id);
 
-        $data = $query->first([ $this->model->getLftName(),
-                                $this->model->getRgtName() ]);
+        $data = $query->first([$this->model->getLftName(),
+            $this->model->getRgtName()]);
 
-        if ( ! $data && $required) {
+        if (! $data && $required) {
             throw new ModelNotFoundException;
         }
 
-        return (array)$data;
+        return (array) $data;
     }
 
     /**
      * Get plain node data.
      *
-     * @since 2.0
-     *
-     * @param mixed $id
-     * @param bool $required
-     *
+     * @param  mixed  $id
+     * @param  bool  $required
      * @return array
+     *
+     * @since 2.0
      */
     public function getPlainNodeData($id, $required = false)
     {
@@ -75,18 +75,16 @@ class QueryBuilder extends Builder
     /**
      * Limit results to ancestors of specified node.
      *
-     * @since 2.0
-     *
-     * @param mixed $id
-     * @param bool $andSelf
-     *
-     * @param string $boolean
-     *
+     * @param  mixed  $id
+     * @param  bool  $andSelf
+     * @param  string  $boolean
      * @return $this
+     *
+     * @since 2.0
      */
     public function whereAncestorOf($id, $andSelf = false, $boolean = 'and')
     {
-        $keyName = $this->model->getTable() . '.' . $this->model->getKeyName();
+        $keyName = $this->model->getTable().'.'.$this->model->getKeyName();
         $model = null;
 
         if (NestedSet::isNode($id)) {
@@ -100,7 +98,7 @@ class QueryBuilder extends Builder
             $valueQuery = $this->model
                 ->newQuery()
                 ->toBase()
-                ->select("_.".$this->model->getRgtName())
+                ->select('_.'.$this->model->getRgtName())
                 ->from($this->model->getTable().' as _')
                 ->where($this->model->getKeyName(), '=', $id)
                 ->limit(1);
@@ -111,12 +109,12 @@ class QueryBuilder extends Builder
         }
 
         $this->query->whereNested(function ($inner) use ($model, $value, $andSelf, $id, $keyName) {
-            list($lft, $rgt) = $this->wrappedColumns();
+            [$lft, $rgt] = $this->wrappedColumns();
             $wrappedTable = $this->query->getGrammar()->wrapTable($this->model->getTable());
 
             $inner->whereRaw("{$value} between {$wrappedTable}.{$lft} and {$wrappedTable}.{$rgt}");
 
-            if ( ! $andSelf) {
+            if (! $andSelf) {
                 $inner->where($keyName, '<>', $id);
             }
             if ($model !== null) {
@@ -130,9 +128,7 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param $id
-     * @param bool $andSelf
-     *
+     * @param  bool  $andSelf
      * @return $this
      */
     public function orWhereAncestorOf($id, $andSelf = false)
@@ -141,8 +137,6 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param $id
-     *
      * @return QueryBuilder
      */
     public function whereAncestorOrSelf($id)
@@ -153,25 +147,20 @@ class QueryBuilder extends Builder
     /**
      * Get ancestors of specified node.
      *
-     * @since 2.0
-     *
-     * @param mixed $id
-     * @param array $columns
-     *
+     * @param  mixed  $id
      * @return \Kalnoy\Nestedset\Collection
+     *
+     * @since 2.0
      */
-    public function ancestorsOf($id, array $columns = array( '*' ))
+    public function ancestorsOf($id, array $columns = ['*'])
     {
         return $this->whereAncestorOf($id)->get($columns);
     }
 
     /**
-     * @param $id
-     * @param array $columns
-     *
      * @return \Kalnoy\Nestedset\Collection
      */
-    public function ancestorsAndSelf($id, array $columns = [ '*' ])
+    public function ancestorsAndSelf($id, array $columns = ['*'])
     {
         return $this->whereAncestorOf($id, true)->get($columns);
     }
@@ -179,18 +168,17 @@ class QueryBuilder extends Builder
     /**
      * Add node selection statement between specified range.
      *
-     * @since 2.0
-     *
-     * @param array $values
-     * @param string $boolean
-     * @param bool $not
-     * @param Query $query
-     *
+     * @param  array  $values
+     * @param  string  $boolean
+     * @param  bool  $not
+     * @param  Query  $query
      * @return $this
+     *
+     * @since 2.0
      */
     public function whereNodeBetween($values, $boolean = 'and', $not = false, $query = null)
     {
-        ($query ?? $this->query)->whereBetween($this->model->getTable() . '.' . $this->model->getLftName(), $values, $boolean, $not);
+        ($query ?? $this->query)->whereBetween($this->model->getTable().'.'.$this->model->getLftName(), $values, $boolean, $not);
 
         return $this;
     }
@@ -198,11 +186,10 @@ class QueryBuilder extends Builder
     /**
      * Add node selection statement between specified range joined with `or` operator.
      *
-     * @since 2.0
-     *
-     * @param array $values
-     *
+     * @param  array  $values
      * @return $this
+     *
+     * @since 2.0
      */
     public function orWhereNodeBetween($values)
     {
@@ -212,17 +199,16 @@ class QueryBuilder extends Builder
     /**
      * Add constraint statement to descendants of specified node.
      *
-     * @since 2.0
-     *
-     * @param mixed $id
-     * @param string $boolean
-     * @param bool $not
-     * @param bool $andSelf
-     *
+     * @param  mixed  $id
+     * @param  string  $boolean
+     * @param  bool  $not
+     * @param  bool  $andSelf
      * @return $this
+     *
+     * @since 2.0
      */
     public function whereDescendantOf($id, $boolean = 'and', $not = false,
-                                      $andSelf = false
+        $andSelf = false
     ) {
         $this->query->whereNested(function (Query $inner) use ($id, $andSelf, $not) {
             if (NestedSet::isNode($id)) {
@@ -236,8 +222,8 @@ class QueryBuilder extends Builder
             }
 
             // Don't include the node
-            if (!$andSelf) {
-                ++$data[0];
+            if (! $andSelf) {
+                $data[0]++;
             }
 
             return $this->whereNodeBetween($data, 'and', $not, $inner);
@@ -247,8 +233,7 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param mixed $id
-     *
+     * @param  mixed  $id
      * @return QueryBuilder
      */
     public function whereNotDescendantOf($id)
@@ -257,8 +242,7 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param mixed $id
-     *
+     * @param  mixed  $id
      * @return QueryBuilder
      */
     public function orWhereDescendantOf($id)
@@ -267,8 +251,7 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param mixed $id
-     *
+     * @param  mixed  $id
      * @return QueryBuilder
      */
     public function orWhereNotDescendantOf($id)
@@ -277,10 +260,8 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param $id
-     * @param string $boolean
-     * @param bool $not
-     *
+     * @param  string  $boolean
+     * @param  bool  $not
      * @return $this
      */
     public function whereDescendantOrSelf($id, $boolean = 'and', $not = false)
@@ -291,41 +272,30 @@ class QueryBuilder extends Builder
     /**
      * Get descendants of specified node.
      *
-     * @since 2.0
-     *
-     * @param mixed $id
-     * @param array $columns
-     * @param bool $andSelf
-     *
+     * @param  mixed  $id
+     * @param  bool  $andSelf
      * @return Collection
+     *
+     * @since 2.0
      */
-    public function descendantsOf($id, array $columns = [ '*' ], $andSelf = false)
+    public function descendantsOf($id, array $columns = ['*'], $andSelf = false)
     {
         try {
             return $this->whereDescendantOf($id, 'and', false, $andSelf)->get($columns);
-        }
-
-        catch (ModelNotFoundException $e) {
+        } catch (ModelNotFoundException $e) {
             return $this->model->newCollection();
         }
     }
 
     /**
-     * @param $id
-     * @param array $columns
-     *
      * @return Collection
      */
-    public function descendantsAndSelf($id, array $columns = [ '*' ])
+    public function descendantsAndSelf($id, array $columns = ['*'])
     {
         return $this->descendantsOf($id, $columns, true);
     }
 
     /**
-     * @param $id
-     * @param $operator
-     * @param $boolean
-     *
      * @return $this
      */
     protected function whereIsBeforeOrAfter($id, $operator, $boolean)
@@ -347,9 +317,9 @@ class QueryBuilder extends Builder
             $value = '('.$valueQuery->toSql().')';
         }
 
-        list($lft,) = $this->wrappedColumns();
+        [$lft] = $this->wrappedColumns();
 
-        $this->query->whereRaw("{$lft} {$operator} {$value}", [ ], $boolean);
+        $this->query->whereRaw("{$lft} {$operator} {$value}", [], $boolean);
 
         return $this;
     }
@@ -357,12 +327,11 @@ class QueryBuilder extends Builder
     /**
      * Constraint nodes to those that are after specified node.
      *
-     * @since 2.0
-     *
-     * @param mixed $id
-     * @param string $boolean
-     *
+     * @param  mixed  $id
+     * @param  string  $boolean
      * @return $this
+     *
+     * @since 2.0
      */
     public function whereIsAfter($id, $boolean = 'and')
     {
@@ -372,12 +341,11 @@ class QueryBuilder extends Builder
     /**
      * Constraint nodes to those that are before specified node.
      *
-     * @since 2.0
-     *
-     * @param mixed $id
-     * @param string $boolean
-     *
+     * @param  mixed  $id
+     * @param  string  $boolean
      * @return $this
+     *
+     * @since 2.0
      */
     public function whereIsBefore($id, $boolean = 'and')
     {
@@ -389,17 +357,15 @@ class QueryBuilder extends Builder
      */
     public function whereIsLeaf()
     {
-        list($lft, $rgt) = $this->wrappedColumns();
+        [$lft, $rgt] = $this->wrappedColumns();
 
         return $this->whereRaw("$lft = $rgt - 1");
     }
 
     /**
-     * @param array $columns
-     *
      * @return Collection
      */
-    public function leaves(array $columns = [ '*'])
+    public function leaves(array $columns = ['*'])
     {
         return $this->whereIsLeaf()->get($columns);
     }
@@ -407,17 +373,18 @@ class QueryBuilder extends Builder
     /**
      * Include depth level into the result.
      *
-     * @param string $as
-     *
+     * @param  string  $as
      * @return $this
      */
     public function withDepth($as = 'depth')
     {
-        if ($this->query->columns === null) $this->query->columns = [ '*' ];
+        if ($this->query->columns === null) {
+            $this->query->columns = ['*'];
+        }
 
         $table = $this->wrappedTable();
 
-        list($lft, $rgt) = $this->wrappedColumns();
+        [$lft, $rgt] = $this->wrappedColumns();
 
         $alias = '_d';
         $wrappedAlias = $this->query->getGrammar()->wrapTable($alias);
@@ -437,9 +404,9 @@ class QueryBuilder extends Builder
     /**
      * Get wrapped `lft` and `rgt` column names.
      *
-     * @since 2.0
-     *
      * @return array
+     *
+     * @since 2.0
      */
     protected function wrappedColumns()
     {
@@ -454,9 +421,9 @@ class QueryBuilder extends Builder
     /**
      * Get a wrapped table name.
      *
-     * @since 2.0
-     *
      * @return string
+     *
+     * @since 2.0
      */
     protected function wrappedTable()
     {
@@ -466,9 +433,9 @@ class QueryBuilder extends Builder
     /**
      * Wrap model's key name.
      *
-     * @since 2.0
-     *
      * @return string
+     *
+     * @since 2.0
      */
     protected function wrappedKey()
     {
@@ -490,10 +457,10 @@ class QueryBuilder extends Builder
     /**
      * Equivalent of `withoutRoot`.
      *
-     * @since 2.0
-     * @deprecated since v4.1
-     *
      * @return $this
+     *
+     * @deprecated since v4.1
+     * @since 2.0
      */
     public function hasParent()
     {
@@ -505,14 +472,14 @@ class QueryBuilder extends Builder
     /**
      * Get only nodes that have children.
      *
-     * @since 2.0
-     * @deprecated since v4.1
-     *
      * @return $this
+     *
+     * @deprecated since v4.1
+     * @since 2.0
      */
     public function hasChildren()
     {
-        list($lft, $rgt) = $this->wrappedColumns();
+        [$lft, $rgt] = $this->wrappedColumns();
 
         $this->query->whereRaw("{$rgt} > {$lft} + 1");
 
@@ -522,8 +489,7 @@ class QueryBuilder extends Builder
     /**
      * Order by node position.
      *
-     * @param string $dir
-     *
+     * @param  string  $dir
      * @return $this
      */
     public function defaultOrder($dir = 'asc')
@@ -548,15 +514,14 @@ class QueryBuilder extends Builder
     /**
      * Move a node to the new position.
      *
-     * @param mixed $key
-     * @param int $position
-     *
+     * @param  mixed  $key
+     * @param  int  $position
      * @return int
      */
     public function moveNode($key, $position)
     {
-        list($lft, $rgt) = $this->model->newNestedSetQuery()
-                                       ->getPlainNodeData($key, true);
+        [$lft, $rgt] = $this->model->newNestedSetQuery()
+            ->getPlainNodeData($key, true);
 
         if ($lft < $position && $position <= $rgt) {
             throw new LogicException('Cannot move node into itself.');
@@ -585,7 +550,7 @@ class QueryBuilder extends Builder
 
         $params = compact('lft', 'rgt', 'from', 'to', 'height', 'distance');
 
-        $boundary = [ $from, $to ];
+        $boundary = [$from, $to];
 
         $query = $this->toBase()->where(function (Query $inner) use ($boundary) {
             $inner->whereBetween($this->model->getLftName(), $boundary);
@@ -598,12 +563,11 @@ class QueryBuilder extends Builder
     /**
      * Make or remove gap in the tree. Negative height will remove gap.
      *
-     * @since 2.0
-     *
-     * @param int $cut
-     * @param int $height
-     *
+     * @param  int  $cut
+     * @param  int  $height
      * @return int
+     *
+     * @since 2.0
      */
     public function makeGap($cut, $height)
     {
@@ -620,11 +584,10 @@ class QueryBuilder extends Builder
     /**
      * Get patch for columns.
      *
-     * @since 2.0
-     *
-     * @param array $params
      *
      * @return array
+     *
+     * @since 2.0
      */
     protected function patch(array $params)
     {
@@ -632,7 +595,7 @@ class QueryBuilder extends Builder
 
         $columns = [];
 
-        foreach ([ $this->model->getLftName(), $this->model->getRgtName() ] as $col) {
+        foreach ([$this->model->getLftName(), $this->model->getRgtName()] as $col) {
             $columns[$col] = $this->columnPatch($grammar->wrap($col), $params);
         }
 
@@ -642,19 +605,19 @@ class QueryBuilder extends Builder
     /**
      * Get patch for single column.
      *
-     * @since 2.0
-     *
-     * @param string $col
-     * @param array $params
-     *
+     * @param  string  $col
      * @return string
+     *
+     * @since 2.0
      */
     protected function columnPatch($col, array $params)
     {
         extract($params);
 
         /** @var int $height */
-        if ($height > 0) $height = '+'.$height;
+        if ($height > 0) {
+            $height = '+'.$height;
+        }
 
         if (isset($cut)) {
             return new Expression("case when {$col} >= {$cut} then {$col}{$height} else {$col} end");
@@ -665,21 +628,23 @@ class QueryBuilder extends Builder
         /** @var int $rgt */
         /** @var int $from */
         /** @var int $to */
-        if ($distance > 0) $distance = '+'.$distance;
+        if ($distance > 0) {
+            $distance = '+'.$distance;
+        }
 
-        return new Expression("case ".
-                              "when {$col} between {$lft} and {$rgt} then {$col}{$distance} ". // Move the node
-                              "when {$col} between {$from} and {$to} then {$col}{$height} ". // Move other nodes
-                              "else {$col} end"
+        return new Expression('case '.
+            "when {$col} between {$lft} and {$rgt} then {$col}{$distance} ". // Move the node
+            "when {$col} between {$from} and {$to} then {$col}{$height} ". // Move other nodes
+            "else {$col} end"
         );
     }
 
     /**
      * Get statistics of errors of the tree.
      *
-     * @since 2.0
-     *
      * @return array
+     *
+     * @since 2.0
      */
     public function countErrors()
     {
@@ -695,7 +660,7 @@ class QueryBuilder extends Builder
         $checks['wrong_parent'] = $this->getWrongParentQuery();
 
         // Check for nodes that have missing parent
-        $checks['missing_parent' ] = $this->getMissingParentQuery();
+        $checks['missing_parent'] = $this->getMissingParentQuery();
 
         $query = $this->query->newQuery();
 
@@ -705,7 +670,7 @@ class QueryBuilder extends Builder
             $query->selectSub($inner, $key);
         }
 
-        return (array)$query->first();
+        return (array) $query->first();
     }
 
     /**
@@ -717,10 +682,10 @@ class QueryBuilder extends Builder
             ->newNestedSetQuery()
             ->toBase()
             ->whereNested(function (BaseQueryBuilder $inner) {
-                list($lft, $rgt) = $this->wrappedColumns();
+                [$lft, $rgt] = $this->wrappedColumns();
 
                 $inner->whereRaw("{$lft} >= {$rgt}")
-                      ->orWhereRaw("({$rgt} - {$lft}) % 2 = 0");
+                    ->orWhereRaw("({$rgt} - {$lft}) % 2 = 0");
             });
     }
 
@@ -744,12 +709,12 @@ class QueryBuilder extends Builder
             ->from($this->query->raw("{$table} as {$waFirst}, {$table} {$waSecond}"))
             ->whereRaw("{$waFirst}.{$keyName} < {$waSecond}.{$keyName}")
             ->whereNested(function (BaseQueryBuilder $inner) use ($waFirst, $waSecond) {
-                list($lft, $rgt) = $this->wrappedColumns();
+                [$lft, $rgt] = $this->wrappedColumns();
 
                 $inner->orWhereRaw("{$waFirst}.{$lft}={$waSecond}.{$lft}")
-                      ->orWhereRaw("{$waFirst}.{$rgt}={$waSecond}.{$rgt}")
-                      ->orWhereRaw("{$waFirst}.{$lft}={$waSecond}.{$rgt}")
-                      ->orWhereRaw("{$waFirst}.{$rgt}={$waSecond}.{$lft}");
+                    ->orWhereRaw("{$waFirst}.{$rgt}={$waSecond}.{$rgt}")
+                    ->orWhereRaw("{$waFirst}.{$lft}={$waSecond}.{$rgt}")
+                    ->orWhereRaw("{$waFirst}.{$rgt}={$waSecond}.{$lft}");
             });
 
         return $this->model->applyNestedSetScope($query, $secondAlias);
@@ -783,11 +748,11 @@ class QueryBuilder extends Builder
             ->whereRaw("{$waInterm}.{$keyName} <> {$waParent}.{$keyName}")
             ->whereRaw("{$waInterm}.{$keyName} <> {$waChild}.{$keyName}")
             ->whereNested(function (BaseQueryBuilder $inner) use ($waInterm, $waChild, $waParent) {
-                list($lft, $rgt) = $this->wrappedColumns();
+                [$lft, $rgt] = $this->wrappedColumns();
 
                 $inner->whereRaw("{$waChild}.{$lft} not between {$waParent}.{$lft} and {$waParent}.{$rgt}")
-                      ->orWhereRaw("{$waChild}.{$lft} between {$waInterm}.{$lft} and {$waInterm}.{$rgt}")
-                      ->whereRaw("{$waInterm}.{$lft} between {$waParent}.{$lft} and {$waParent}.{$rgt}");
+                    ->orWhereRaw("{$waChild}.{$lft} between {$waInterm}.{$lft} and {$waInterm}.{$rgt}")
+                    ->whereRaw("{$waInterm}.{$lft} between {$waParent}.{$lft} and {$waParent}.{$rgt}");
             });
 
         $this->model->applyNestedSetScope($query, $parentAlias);
@@ -824,16 +789,16 @@ class QueryBuilder extends Builder
                 $this->model->applyNestedSetScope($existsCheck, $alias);
 
                 $inner->whereRaw("{$parentIdName} is not null")
-                      ->addWhereExistsQuery($existsCheck, 'and', true);
+                    ->addWhereExistsQuery($existsCheck, 'and', true);
             });
     }
 
     /**
      * Get the number of total errors of the tree.
      *
-     * @since 2.0
-     *
      * @return int
+     *
+     * @since 2.0
      */
     public function getTotalErrors()
     {
@@ -843,9 +808,9 @@ class QueryBuilder extends Builder
     /**
      * Get whether the tree is broken.
      *
-     * @since 2.0
-     *
      * @return bool
+     *
+     * @since 2.0
      */
     public function isBroken()
     {
@@ -857,8 +822,7 @@ class QueryBuilder extends Builder
      *
      * Nodes with invalid parent are saved as roots.
      *
-     * @param null|NodeTrait|Model $root
-     *
+     * @param  null|NodeTrait|Model  $root
      * @return int The number of changed nodes
      */
     public function fixTree($root = null)
@@ -884,8 +848,7 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param NodeTrait|Model $root
-     *
+     * @param  NodeTrait|Model  $root
      * @return int
      */
     public function fixSubtree($root)
@@ -894,9 +857,7 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param array $dictionary
-     * @param NodeTrait|Model|null $parent
-     *
+     * @param  NodeTrait|Model|null  $parent
      * @return int
      */
     protected function fixNodes(array &$dictionary, $parent = null)
@@ -910,7 +871,7 @@ class QueryBuilder extends Builder
         $cut = self::reorderNodes($dictionary, $updated, $parentId, $cut);
 
         // Save nodes that have invalid parent as roots
-        while ( ! empty($dictionary)) {
+        while (! empty($dictionary)) {
             $dictionary[null] = reset($dictionary);
 
             unset($dictionary[key($dictionary)]);
@@ -932,18 +893,15 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param array $dictionary
-     * @param array $updated
-     * @param $parentId
-     * @param int $cut
-     *
+     * @param  int  $cut
      * @return int
+     *
      * @internal param int $fixed
      */
     protected static function reorderNodes(
         array &$dictionary, array &$updated, $parentId = null, $cut = 1
     ) {
-        if ( ! isset($dictionary[$parentId])) {
+        if (! isset($dictionary[$parentId])) {
             return $cut;
         }
 
@@ -957,7 +915,7 @@ class QueryBuilder extends Builder
                 $updated[] = $model;
             }
 
-            ++$cut;
+            $cut++;
         }
 
         unset($dictionary[$parentId]);
@@ -970,11 +928,9 @@ class QueryBuilder extends Builder
      *
      * If item data does not contain primary key, new node will be created.
      *
-     * @param array $data
-     * @param bool $delete Whether to delete nodes that exists but not in the data
-     *                     array
-     * @param null $root
-     *
+     * @param  bool  $delete  Whether to delete nodes that exists but not in the data
+     *                        array
+     * @param  null  $root
      * @return int
      */
     public function rebuildTree(array $data, $delete = false, $root = null)
@@ -996,7 +952,7 @@ class QueryBuilder extends Builder
         $this->buildRebuildDictionary($dictionary, $data, $existing, $parentId);
 
         /** @var Model|NodeTrait $model */
-        if ( ! empty($existing)) {
+        if (! empty($existing)) {
             if ($delete && ! $this->model->usesSoftDelete()) {
                 $this->model
                     ->newScopedQuery()
@@ -1021,10 +977,7 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param $root
-     * @param array $data
-     * @param bool $delete
-     *
+     * @param  bool  $delete
      * @return int
      */
     public function rebuildSubtree($root, array $data, $delete = false)
@@ -1033,28 +986,24 @@ class QueryBuilder extends Builder
     }
 
     /**
-     * @param array $dictionary
-     * @param array $data
-     * @param array $existing
-     * @param mixed $parentId
+     * @param  mixed  $parentId
      */
     protected function buildRebuildDictionary(array &$dictionary,
-                                              array $data,
-                                              array &$existing,
-                                                    $parentId = null
+        array $data,
+        array &$existing,
+        $parentId = null
     ) {
         $keyName = $this->model->getKeyName();
 
         foreach ($data as $itemData) {
             /** @var NodeTrait|Model $model */
-
-            if ( ! isset($itemData[$keyName])) {
+            if (! isset($itemData[$keyName])) {
                 $model = $this->model->newInstance($this->model->getAttributes());
 
                 // Set some values that will be fixed later
                 $model->rawNode(0, 0, $parentId);
             } else {
-                if ( ! isset($existing[$key = $itemData[$keyName]])) {
+                if (! isset($existing[$key = $itemData[$keyName]])) {
                     throw new ModelNotFoundException;
                 }
 
@@ -1070,18 +1019,19 @@ class QueryBuilder extends Builder
 
             $dictionary[$parentId][] = $model;
 
-            if ( ! isset($itemData['children'])) continue;
+            if (! isset($itemData['children'])) {
+                continue;
+            }
 
             $this->buildRebuildDictionary($dictionary,
-                                          $itemData['children'],
-                                          $existing,
-                                          $model->getKey());
+                $itemData['children'],
+                $existing,
+                $model->getKey());
         }
     }
 
     /**
-     * @param string|null $table
-     *
+     * @param  string|null  $table
      * @return $this
      */
     public function applyNestedSetScope($table = null)
@@ -1092,7 +1042,6 @@ class QueryBuilder extends Builder
     /**
      * Get the root node.
      *
-     * @param array $columns
      *
      * @return self
      */
